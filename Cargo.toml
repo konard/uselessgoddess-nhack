@@ -1,0 +1,75 @@
+[package]
+name = "neurohack"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "A TUI Roguelike with AI-powered narrative generation"
+repository = "https://github.com/uselessgoddess/nhack"
+
+[dependencies]
+# Bevy ECS & core
+bevy = { version = "0.17", default-features = false, features = [
+    "bevy_state",
+    "multi_threaded",
+    "std",
+] }
+
+# TUI framework
+bevy_ratatui = "0.10"
+ratatui = "0.29"
+# Use the same crossterm version that ratatui uses
+crossterm = "0.28"
+
+# Async runtime for non-blocking AI calls
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "macros"] }
+
+# HTTP client for Ollama API
+reqwest = { version = "0.12", features = ["json"] }
+
+# Serialization for structured AI responses
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Logging
+tracing = { version = "0.1", features = [
+    "max_level_debug",
+    "release_max_level_warn",
+] }
+
+# Random number generation for roguelike mechanics
+rand = "0.9"
+getrandom = "0.3"
+
+# Error handling
+thiserror = "2"
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[features]
+default = ["dev_native"]
+dev = [
+    "bevy/dynamic_linking",
+    "bevy/bevy_dev_tools",
+    "bevy/track_location",
+]
+dev_native = ["dev"]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(bevy_lint)"] }
+
+[lints.clippy]
+too_many_arguments = "allow"
+type_complexity = "allow"
+nonstandard_macro_braces = "warn"
+
+# Compile with Performance Optimizations
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
