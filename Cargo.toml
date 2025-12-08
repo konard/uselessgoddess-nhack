@@ -46,6 +46,10 @@ getrandom = "0.3"
 # Error handling
 thiserror = "2"
 
+# Localization (i18n) using Mozilla's Fluent format
+bevy_fluent = "0.13"
+unic-langid = "0.9"
+
 [dev-dependencies]
 tokio-test = "0.4"
 

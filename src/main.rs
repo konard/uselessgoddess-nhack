@@ -9,6 +9,7 @@
 mod ai;
 mod dnd;
 mod game;
+mod i18n;
 mod input;
 mod screens;
 mod theme;
@@ -54,6 +55,7 @@ impl Plugin for AppPlugin {
         app.add_plugins((
             dnd::plugin,
             game::plugin,
+            i18n::plugin,
             input::plugin,
             ai::plugin,
             tui::plugin,
