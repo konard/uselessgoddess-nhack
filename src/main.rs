@@ -17,6 +17,7 @@ use std::time::Duration;
 
 use bevy::app::ScheduleRunnerPlugin;
 use bevy::prelude::*;
+use bevy::state::app::StatesPlugin;
 use bevy_ratatui::RatatuiPlugins;
 
 use screens::GameScreen;
@@ -38,9 +39,12 @@ pub struct AppPlugin {
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut App) {
         // Core Bevy plugins (minimal set for TUI)
-        app.add_plugins(
+        app.add_plugins((
             MinimalPlugins.set(ScheduleRunnerPlugin::run_loop(self.frame_time)),
-        );
+            // StatesPlugin is required for state management with MinimalPlugins
+            // (DefaultPlugins includes it, but MinimalPlugins does not)
+            StatesPlugin,
+        ));
 
         // Ratatui TUI integration
         app.add_plugins(RatatuiPlugins::default());

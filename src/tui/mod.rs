@@ -5,9 +5,8 @@ mod render;
 mod tooltip;
 mod widgets;
 
-pub use mouse::{GridClickMessage, GridHoverMessage, GridViewport, MouseState};
+// Re-export types used by other modules.
 pub use render::CurrentNarrative;
-pub use tooltip::TooltipState;
 
 use bevy::prelude::*;
 

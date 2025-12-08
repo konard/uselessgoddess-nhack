@@ -6,14 +6,17 @@
 //! - Armor Class calculations
 //! - Combat mechanics (attack rolls, damage)
 //! - Equipment (weapons, armor)
-//! - Character data (races, classes)
+//! - Status effects and conditions
+//! - Spellcasting system
 
 pub mod ability;
 pub mod armor;
 pub mod combat;
 pub mod components;
 pub mod dice;
+pub mod effects;
 pub mod monsters;
+pub mod spells;
 pub mod weapons;
 
 use bevy::prelude::*;
@@ -28,15 +31,15 @@ pub fn plugin(app: &mut App) {
         armor::plugin,
         combat::plugin,
         monsters::plugin,
+        effects::plugin,
+        spells::plugin,
     ));
 }
 
-// Re-export commonly used types
-pub use ability::{Ability, AbilityScores};
-pub use armor::{Armor, ArmorCategory, ArmorType};
-pub use combat::AttackResult;
+// Re-export key types for external use.
+// Most types should be accessed via their submodule (e.g., dnd::ability::Ability).
+pub use ability::AbilityScores;
+pub use components::ArmorClass;
+pub use dice::DiceRoller;
+pub use effects::{DamageModifiers, StatusEffects};
 pub use weapons::DamageType;
-pub use components::{ArmorClass, CharacterSheet, Equipment, Proficiencies, Skills};
-pub use dice::{Dice, DiceRoll, DiceType};
-pub use monsters::{ChallengeRating, MonsterTemplate};
-pub use weapons::{Weapon, WeaponCategory, WeaponProperty, WeaponType};

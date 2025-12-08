@@ -6,10 +6,7 @@ mod flavor;
 mod prompts;
 mod worker;
 
-pub use flavor::{
-    apply_monster_flavor, FlavorEngine, FlavorRequestKind, FlavorRequestMessage,
-    FlavorResponseKind, FlavorResponseMessage, MonsterFlavor,
-};
+// Re-export types used by gameplay systems.
 pub use worker::{
     NarrativeRequest, NarrativeRequestKind, NarrativeResponse, NarrativeResponseKind,
     RoomContentData,
