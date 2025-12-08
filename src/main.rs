@@ -7,6 +7,7 @@
 #![cfg_attr(bevy_lint, feature(register_tool), register_tool(bevy))]
 
 mod ai;
+mod dnd;
 mod game;
 mod screens;
 mod theme;
@@ -46,6 +47,7 @@ impl Plugin for AppPlugin {
 
         // Game plugins
         app.add_plugins((
+            dnd::plugin,
             game::plugin,
             ai::plugin,
             tui::plugin,
