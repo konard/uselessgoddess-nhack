@@ -1,12 +1,16 @@
 //! AI-to-ECS Bridge - Converts AI responses to ECS components.
+//!
+//! Uses Ollama's structured outputs for reliable JSON generation.
 
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::game::{Description, Dialogue, GameMap, MonsterKind, Position, Room};
 
-use super::client::{OllamaClient, OllamaError};
+use super::client::OllamaClient;
+pub use super::client::OllamaError;
 use super::prompts::{self, RoomContent};
+use super::schema;
 
 /// Plugin for AI bridge systems.
 pub fn plugin(app: &mut App) {
@@ -108,6 +112,8 @@ impl AiBridge {
 
     /// Generate a description for a room based on its contents.
     ///
+    /// Uses Ollama's structured outputs for reliable JSON generation.
+    ///
     /// # Example
     ///
     /// ```ignore
@@ -127,49 +133,61 @@ impl AiBridge {
         contents: &[RoomContent],
     ) -> Result<Description, OllamaError> {
         let prompt = prompts::room_description_prompt(room, contents);
-        let response: RoomDescriptionResponse = self.client.generate_json(&prompt).await?;
+        let response: RoomDescriptionResponse = self
+            .client
+            .generate_structured(&prompt, schema::room_description_schema())
+            .await?;
         Ok(response.into())
     }
 
-    /// Generate dialogue for a monster encounter.
+    /// Generate dialogue for a monster encounter using structured outputs.
     pub async fn generate_monster_dialogue(
         &self,
         monster: MonsterKind,
         player_health_percent: f32,
     ) -> Result<Dialogue, OllamaError> {
         let prompt = prompts::monster_dialogue_prompt(monster, player_health_percent);
-        let response: MonsterDialogueResponse = self.client.generate_json(&prompt).await?;
+        let response: MonsterDialogueResponse = self
+            .client
+            .generate_structured(&prompt, schema::monster_dialogue_schema())
+            .await?;
         Ok(response.into())
     }
 
-    /// Interpret an improvisational player action.
+    /// Interpret an improvisational player action using structured outputs.
     pub async fn interpret_action(
         &self,
         action: &str,
         context: &str,
     ) -> Result<ActionInterpretation, OllamaError> {
         let prompt = prompts::interpret_action_prompt(action, context);
-        self.client.generate_json(&prompt).await
+        self.client
+            .generate_structured(&prompt, schema::action_interpretation_schema())
+            .await
     }
 
-    /// Generate a death narration.
+    /// Generate a death narration using structured outputs.
     pub async fn generate_death_narration(
         &self,
         cause: &str,
         floor: i32,
     ) -> Result<DeathNarration, OllamaError> {
         let prompt = prompts::death_narration_prompt(cause, floor);
-        self.client.generate_json(&prompt).await
+        self.client
+            .generate_structured(&prompt, schema::death_narration_schema())
+            .await
     }
 
-    /// Generate lore for an item discovery.
+    /// Generate lore for an item discovery using structured outputs.
     pub async fn generate_lore(
         &self,
         item_name: &str,
         location_description: &str,
     ) -> Result<LoreDiscovery, OllamaError> {
         let prompt = prompts::lore_discovery_prompt(item_name, location_description);
-        self.client.generate_json(&prompt).await
+        self.client
+            .generate_structured(&prompt, schema::lore_discovery_schema())
+            .await
     }
 
     /// Check if the AI backend is available.

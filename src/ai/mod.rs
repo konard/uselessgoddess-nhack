@@ -4,6 +4,7 @@ mod bridge;
 mod client;
 mod flavor;
 mod prompts;
+pub mod schema;
 mod worker;
 
 // Re-export types used by gameplay systems.

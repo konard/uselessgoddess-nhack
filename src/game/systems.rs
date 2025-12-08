@@ -74,7 +74,7 @@ impl GameLog {
 /// Process movement intentions.
 fn process_movement(
     mut messages: MessageReader<MoveIntent>,
-    mut positions: Query<&mut Position>,
+    mut positions: Query<&mut Position, Without<Monster>>,
     monsters: Query<(Entity, &Position), With<Monster>>,
     map: Res<GameMap>,
     mut combat_messages: MessageWriter<CombatEvent>,

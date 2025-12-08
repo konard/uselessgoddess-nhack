@@ -6,7 +6,7 @@ use super::mouse::{GridHoverMessage, MouseState};
 use crate::dnd::{AbilityScores, ArmorClass};
 use crate::dnd::components::HitPoints;
 use crate::dnd::monsters::MonsterTemplate;
-use crate::game::{Monster, Player, Position};
+use crate::game::{Monster, Player};
 
 /// Plugin for tooltip systems.
 pub fn plugin(app: &mut App) {
@@ -88,7 +88,6 @@ fn update_tooltip_on_hover(
         (&Name, Option<&HitPoints>, Option<&ArmorClass>),
         With<Player>,
     >,
-    position_query: Query<&Position>,
 ) {
     for hover_msg in hover_messages.read() {
         // Clear tooltip if no entity

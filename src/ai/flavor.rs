@@ -5,16 +5,20 @@
 //! - AI creativity for immersion
 //! - Deterministic game balance
 //! - Type-safe ECS integration
+//!
+//! This module uses Ollama's structured outputs feature for reliable JSON generation.
+//! See: <https://ollama.com/blog/structured-outputs>
 
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use crate::dnd::armor::{ArmorDatabase, ArmorType};
 use crate::dnd::monsters::{MonsterDatabase, MonsterTemplate, MonsterType};
 use crate::dnd::weapons::{WeaponDatabase, WeaponType};
-use crate::dnd::armor::{ArmorDatabase, ArmorType};
 
-use super::client::{OllamaClient, OllamaError};
 use super::bridge::AiBridgeConfig;
+use super::client::{OllamaClient, OllamaError};
+use super::schema;
 
 /// Plugin for AI flavor generation.
 pub fn plugin(app: &mut App) {
@@ -151,45 +155,38 @@ impl FlavorEngine {
         Self { client }
     }
 
-    /// Generate flavor for a monster.
+    /// Generate flavor for a monster using structured outputs.
     ///
-    /// The prompt enforces a JSON schema that separates flavor from mechanics.
-    /// Rust then maps flavor strings back to game components.
+    /// Uses Ollama's structured outputs feature to ensure the AI response
+    /// matches the expected JSON schema. This is more reliable than basic
+    /// JSON mode as the model's output is constrained by the schema.
     pub async fn generate_monster_flavor(
         &self,
         monster_type: MonsterType,
     ) -> Result<MonsterFlavor, OllamaError> {
         let data = monster_type.data();
 
+        let system_msg = "You are a horror-themed Dungeon Master generating flavor for D&D monsters. \
+            Be creative and unsettling. Focus on sensory details that create atmosphere.";
+
         let prompt = format!(
-            r#"You are a horror-themed Dungeon Master generating flavor for a D&D monster.
-
-Monster Type: {} (CR {})
-Creature Type: {:?}
-Size: {:?}
-
-Generate unique, atmospheric flavor for this creature. The game will use the mechanical stats (HP, AC, damage) from D&D rules - you only provide the narrative flavor.
-
-Respond with ONLY a JSON object in this exact format:
-{{
-    "name": "A unique, evocative name (e.g., 'Calcified Guardian', 'Snaggletooth the Rotting')",
-    "visual_desc": "2-3 sentences describing appearance, focusing on unsettling details",
-    "weapon_flavor": "Custom name for their weapon (e.g., 'Rusted Pickaxe') or null if unarmed",
-    "armor_flavor": "Custom name for their armor (e.g., 'Moldy Leather Armor') or null if unarmored",
-    "personality_trait": "One-line personality or behavior trait"
-}}
-
-Be creative and unsettling. Focus on sensory details that create atmosphere."#,
+            "Generate unique, atmospheric flavor for this creature:\n\n\
+            Monster Type: {} (CR {})\n\
+            Creature Type: {:?}\n\
+            Size: {:?}\n\n\
+            The game uses D&D mechanical stats (HP, AC, damage) - you only provide narrative flavor.",
             data.name,
             data.challenge_rating.display(),
             data.creature_type,
             data.size,
         );
 
-        self.client.generate_json(&prompt).await
+        self.client
+            .generate_structured_with_system(system_msg, &prompt, schema::monster_flavor_schema())
+            .await
     }
 
-    /// Generate flavor for a weapon found in the world.
+    /// Generate flavor for a weapon found in the world using structured outputs.
     pub async fn generate_weapon_flavor(
         &self,
         weapon_type: WeaponType,
@@ -197,22 +194,14 @@ Be creative and unsettling. Focus on sensory details that create atmosphere."#,
     ) -> Result<WeaponFlavor, OllamaError> {
         let data = weapon_type.base_data();
 
+        let system_msg = "You are a horror-themed Dungeon Master generating flavor for weapons. \
+            Make descriptions atmospheric and slightly unsettling.";
+
         let prompt = format!(
-            r#"You are a horror-themed Dungeon Master generating flavor for a weapon.
-
-Weapon Type: {} ({}x{} {} damage)
-Context: {}
-
-Generate atmospheric flavor for this weapon. The game uses D&D mechanics - you provide narrative.
-
-Respond with ONLY a JSON object:
-{{
-    "name": "A descriptive name (e.g., 'Rusted Pickaxe', 'Bone-Hilted Dagger')",
-    "visual_desc": "1-2 sentences describing appearance and condition",
-    "inscription": "Any markings, runes, or inscriptions (or null)"
-}}
-
-Make it fit the horror atmosphere."#,
+            "Generate atmospheric flavor for this weapon:\n\n\
+            Weapon Type: {} ({}d{} {} damage)\n\
+            Context: {}\n\n\
+            The game uses D&D mechanics - you provide narrative flavor only.",
             data.name,
             data.damage.count,
             data.damage.die_type,
@@ -220,10 +209,12 @@ Make it fit the horror atmosphere."#,
             context,
         );
 
-        self.client.generate_json(&prompt).await
+        self.client
+            .generate_structured_with_system(system_msg, &prompt, schema::weapon_flavor_schema())
+            .await
     }
 
-    /// Generate flavor for armor.
+    /// Generate flavor for armor using structured outputs.
     pub async fn generate_armor_flavor(
         &self,
         armor_type: ArmorType,
@@ -231,29 +222,22 @@ Make it fit the horror atmosphere."#,
     ) -> Result<ArmorFlavor, OllamaError> {
         let data = armor_type.base_data();
 
+        let system_msg = "You are a horror-themed Dungeon Master generating flavor for armor. \
+            Make descriptions atmospheric and slightly unsettling.";
+
         let prompt = format!(
-            r#"You are a horror-themed Dungeon Master generating flavor for armor.
-
-Armor Type: {} (AC {}, {:?})
-Context: {}
-
-Generate atmospheric flavor for this armor.
-
-Respond with ONLY a JSON object:
-{{
-    "name": "A descriptive name (e.g., 'Moldy Leather Armor', 'Bone-Studded Vest')",
-    "visual_desc": "1-2 sentences describing appearance and condition",
-    "features": "Any notable features or damage (or null)"
-}}
-
-Make it atmospheric and slightly unsettling."#,
+            "Generate atmospheric flavor for this armor:\n\n\
+            Armor Type: {} (AC {}, {:?})\n\
+            Context: {}",
             data.name,
             data.base_ac,
             data.category,
             context,
         );
 
-        self.client.generate_json(&prompt).await
+        self.client
+            .generate_structured_with_system(system_msg, &prompt, schema::armor_flavor_schema())
+            .await
     }
 }
 
