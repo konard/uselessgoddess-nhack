@@ -10,6 +10,7 @@
 //! See: <https://ollama.com/blog/structured-outputs>
 
 use bevy::prelude::*;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::dnd::armor::{ArmorDatabase, ArmorType};
@@ -96,50 +97,68 @@ pub enum FlavorResponseKind {
 ///     "personality_trait": "Territorial, guards ancient mining shaft"
 /// }
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(description = "AI-generated flavor for a monster with custom name and atmospheric descriptions")]
 pub struct MonsterFlavor {
-    /// Custom name (e.g., "Snaggletooth the Rotting").
+    /// A unique, evocative name (e.g., "Calcified Guardian", "Snaggletooth the Rotting").
+    #[schemars(description = "A unique, evocative name (e.g., 'Calcified Guardian', 'Snaggletooth the Rotting')")]
     pub name: String,
-    /// Visual description.
+    /// 2-3 sentences describing appearance, focusing on unsettling details.
+    #[schemars(description = "2-3 sentences describing appearance, focusing on unsettling details")]
     pub visual_desc: String,
-    /// Flavor text for equipped weapon.
+    /// Custom name for their weapon (e.g., "Rusted Pickaxe") or null if unarmed.
+    #[schemars(description = "Custom name for their weapon (e.g., 'Rusted Pickaxe') or null if unarmed")]
     pub weapon_flavor: Option<String>,
-    /// Flavor text for armor (if any).
+    /// Custom name for their armor (e.g., "Moldy Leather Armor") or null if unarmored.
+    #[schemars(description = "Custom name for their armor (e.g., 'Moldy Leather Armor') or null if unarmored")]
     pub armor_flavor: Option<String>,
-    /// Optional personality trait.
+    /// One-line personality or behavior trait.
+    #[schemars(description = "One-line personality or behavior trait")]
     pub personality_trait: Option<String>,
 }
 
 /// AI-generated flavor for a weapon.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(description = "AI-generated flavor for a weapon with custom name and atmospheric description")]
 pub struct WeaponFlavor {
-    /// Custom name (e.g., "Rusted Pickaxe").
+    /// A descriptive name (e.g., "Rusted Pickaxe", "Bone-Hilted Dagger").
+    #[schemars(description = "A descriptive name (e.g., 'Rusted Pickaxe', 'Bone-Hilted Dagger')")]
     pub name: String,
-    /// Visual description.
+    /// 1-2 sentences describing appearance and condition.
+    #[schemars(description = "1-2 sentences describing appearance and condition")]
     pub visual_desc: String,
-    /// Any inscription or markings.
+    /// Any markings, runes, or inscriptions (or null).
+    #[schemars(description = "Any markings, runes, or inscriptions (or null)")]
     pub inscription: Option<String>,
 }
 
 /// AI-generated flavor for armor.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(description = "AI-generated flavor for armor with custom name and atmospheric description")]
 pub struct ArmorFlavor {
-    /// Custom name (e.g., "Moldy Leather Armor").
+    /// A descriptive name (e.g., "Moldy Leather Armor", "Bone-Studded Vest").
+    #[schemars(description = "A descriptive name (e.g., 'Moldy Leather Armor', 'Bone-Studded Vest')")]
     pub name: String,
-    /// Visual description.
+    /// 1-2 sentences describing appearance and condition.
+    #[schemars(description = "1-2 sentences describing appearance and condition")]
     pub visual_desc: String,
-    /// Any notable features.
+    /// Any notable features or damage (or null).
+    #[schemars(description = "Any notable features or damage (or null)")]
     pub features: Option<String>,
 }
 
 /// AI-generated flavor for a generic item.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(description = "AI-generated flavor for a generic item with custom name and lore")]
 pub struct ItemFlavor {
-    /// Custom name.
+    /// Custom item name.
+    #[schemars(description = "Custom item name")]
     pub name: String,
-    /// Visual description.
+    /// Visual description of the item.
+    #[schemars(description = "Visual description of the item")]
     pub visual_desc: String,
-    /// Lore or history.
+    /// Lore or history of the item.
+    #[schemars(description = "Lore or history of the item")]
     pub lore: Option<String>,
 }
 

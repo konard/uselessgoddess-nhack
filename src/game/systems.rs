@@ -2,6 +2,12 @@
 
 use bevy::prelude::*;
 
+use crate::dnd::ability::AbilityScores;
+use crate::dnd::combat::{make_attack, AttackModifier, AttackResult};
+use crate::dnd::components::{Level, Proficiencies};
+use crate::dnd::dice::DiceRoller;
+use crate::dnd::weapons::{Weapon, WeaponType};
+
 use super::{CombatStats, GameMap, Health, Monster, Player, Position};
 
 /// Plugin for game systems.
@@ -106,11 +112,18 @@ fn process_movement(
     }
 }
 
-/// Process combat messages.
+/// Process combat messages using the D&D combat system.
+///
+/// This system bridges the simple CombatStats component with the full D&D
+/// combat mechanics via `dnd::combat::make_attack`. If entities have D&D
+/// components (AbilityScores, Proficiencies, Level), those are used.
+/// Otherwise, defaults based on CombatStats are generated.
 fn process_combat(
     mut messages: MessageReader<CombatEvent>,
     mut combatants: Query<(&CombatStats, &mut Health, Option<&Player>, Option<&Monster>)>,
+    dnd_query: Query<(Option<&AbilityScores>, Option<&Proficiencies>, Option<&Level>)>,
     names: Query<Option<&Name>>,
+    mut dice_roller: ResMut<DiceRoller>,
     mut log: ResMut<GameLog>,
 ) {
     for message in messages.read() {
@@ -145,24 +158,143 @@ fn process_combat(
             "something".to_string()
         };
 
-        let damage = (attacker_stats.attack - defender_stats.defense).max(0);
-        defender_health.take_damage(damage);
+        // Try to use D&D components if available, otherwise derive from CombatStats
+        let (attacker_ability, attacker_profs, attacker_level) =
+            get_dnd_stats(&dnd_query, message.attacker, attacker_stats);
 
-        if damage > 0 {
-            log.add(format!(
-                "{} hits {} for {} damage!",
-                attacker_name, defender_name, damage
-            ));
-        } else {
-            log.add(format!(
-                "{} attacks {} but does no damage.",
-                attacker_name, defender_name
-            ));
-        }
+        // Derive AC from defender's defense stat (base 10 + defense bonus)
+        let target_ac = 10 + defender_stats.defense;
 
-        if defender_health.is_dead() {
-            log.add(format!("{} is slain!", defender_name));
+        // Create a weapon based on the attacker's attack stat
+        // Higher attack stat = slightly better weapon
+        let weapon = derive_weapon_from_attack(attacker_stats.attack);
+
+        // Perform the D&D attack using make_attack
+        let result = make_attack(
+            &mut dice_roller,
+            &attacker_ability,
+            &attacker_profs,
+            &attacker_level,
+            &weapon,
+            target_ac,
+            AttackModifier::Normal,
+        );
+
+        // Log the result using D&D description
+        log_attack_result(&mut log, &attacker_name, &defender_name, &result);
+
+        // Apply damage if hit
+        if result.hit {
+            defender_health.take_damage(result.damage_total);
+
+            if defender_health.is_dead() {
+                log.add(format!("{} is slain!", defender_name));
+            }
         }
+    }
+}
+
+/// Get D&D stats for an entity, creating defaults if not present.
+fn get_dnd_stats(
+    dnd_query: &Query<(Option<&AbilityScores>, Option<&Proficiencies>, Option<&Level>)>,
+    entity: Entity,
+    combat_stats: &CombatStats,
+) -> (AbilityScores, Proficiencies, Level) {
+    if let Ok((maybe_ability, maybe_profs, maybe_level)) = dnd_query.get(entity) {
+        let ability = maybe_ability.cloned().unwrap_or_else(|| {
+            // Derive ability scores from attack stat
+            // Attack 5 → STR 14, Attack 10 → STR 20
+            let str_score = 10 + (combat_stats.attack.clamp(0, 10));
+            AbilityScores {
+                strength: str_score,
+                dexterity: 10,
+                constitution: 10,
+                intelligence: 10,
+                wisdom: 10,
+                charisma: 10,
+            }
+        });
+
+        let profs = maybe_profs.cloned().unwrap_or_else(|| {
+            // Default to proficient with simple weapons
+            let mut p = Proficiencies::default();
+            p.simple_weapons = true;
+            p
+        });
+
+        let level = maybe_level.cloned().unwrap_or_else(|| {
+            // Derive level from combined stats
+            let total = combat_stats.attack + combat_stats.defense;
+            Level { value: (total / 4).clamp(1, 20) }
+        });
+
+        (ability, profs, level)
+    } else {
+        // Complete defaults based on combat stats
+        let str_score = 10 + combat_stats.attack.clamp(0, 10);
+        let ability = AbilityScores {
+            strength: str_score,
+            dexterity: 10,
+            constitution: 10,
+            intelligence: 10,
+            wisdom: 10,
+            charisma: 10,
+        };
+
+        let mut profs = Proficiencies::default();
+        profs.simple_weapons = true;
+
+        let total = combat_stats.attack + combat_stats.defense;
+        let level = Level { value: (total / 4).clamp(1, 20) };
+
+        (ability, profs, level)
+    }
+}
+
+/// Derive a weapon from the attack stat.
+fn derive_weapon_from_attack(attack: i32) -> Weapon {
+    // Higher attack stat = better weapon type
+    let weapon_type = if attack >= 8 {
+        WeaponType::Longsword // 1d8 martial weapon
+    } else if attack >= 5 {
+        WeaponType::Mace // 1d6 simple weapon
+    } else if attack >= 3 {
+        WeaponType::Dagger // 1d4 simple weapon
+    } else {
+        WeaponType::Unarmed // 1+STR
+    };
+
+    Weapon::new(weapon_type).equipped(true)
+}
+
+/// Log the attack result to the game log.
+fn log_attack_result(log: &mut GameLog, attacker: &str, defender: &str, result: &AttackResult) {
+    if result.fumble {
+        log.add(format!(
+            "{} swings wildly at {} but completely misses!",
+            attacker, defender
+        ));
+    } else if result.critical {
+        log.add(format!(
+            "{} lands a CRITICAL HIT on {}! {} {} damage!",
+            attacker,
+            defender,
+            result.damage_total,
+            result.damage_type.name()
+        ));
+    } else if result.hit {
+        log.add(format!(
+            "{} hits {} for {} {} damage.",
+            attacker,
+            defender,
+            result.damage_total,
+            result.damage_type.name()
+        ));
+    } else {
+        log.add(format!(
+            "{} attacks {} but misses. ({} vs AC {})",
+            attacker, defender, result.total, result.target_ac
+        ));
     }
 }
 

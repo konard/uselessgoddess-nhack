@@ -14,6 +14,7 @@ use crate::game::{GameLog, GameMap, Health, Position, TileType};
 pub struct MapWidget<'a> {
     map: &'a GameMap,
     player_pos: Option<Position>,
+    cursor_pos: Option<Position>,
     entities: Vec<(Position, char, Color)>,
 }
 
@@ -22,12 +23,19 @@ impl<'a> MapWidget<'a> {
         Self {
             map,
             player_pos: None,
+            cursor_pos: None,
             entities: Vec::new(),
         }
     }
 
     pub fn with_player(mut self, pos: Position) -> Self {
         self.player_pos = Some(pos);
+        self
+    }
+
+    /// Add a cursor position for targeting/look mode.
+    pub fn with_cursor(mut self, pos: Position) -> Self {
+        self.cursor_pos = Some(pos);
         self
     }
 
@@ -104,7 +112,7 @@ impl Widget for MapWidget<'_> {
             }
         }
 
-        // Render player (always on top)
+        // Render player (always on top of entities)
         if let Some(player_pos) = self.player_pos {
             let screen_x = (player_pos.x - offset_x) as u16;
             let screen_y = (player_pos.y - offset_y) as u16;
@@ -114,6 +122,19 @@ impl Widget for MapWidget<'_> {
                     .set_char('@')
                     .set_fg(Color::Yellow)
                     .set_style(Style::default().add_modifier(Modifier::BOLD));
+            }
+        }
+
+        // Render cursor (on top of everything, highlighted)
+        if let Some(cursor_pos) = self.cursor_pos {
+            let screen_x = (cursor_pos.x - offset_x) as u16;
+            let screen_y = (cursor_pos.y - offset_y) as u16;
+
+            if screen_x < inner.width && screen_y < inner.height {
+                // Highlight the cursor position with a distinctive background
+                let cell = &mut buf[(inner.x + screen_x, inner.y + screen_y)];
+                cell.set_bg(Color::DarkGray)
+                    .set_style(Style::default().add_modifier(Modifier::REVERSED));
             }
         }
     }
@@ -299,7 +320,21 @@ impl Widget for NarrativeWidget<'_> {
 }
 
 /// Widget for the help/controls display.
-pub struct HelpWidget;
+pub struct HelpWidget {
+    targeting_mode: bool,
+}
+
+impl HelpWidget {
+    pub fn new(targeting_mode: bool) -> Self {
+        Self { targeting_mode }
+    }
+}
+
+impl Default for HelpWidget {
+    fn default() -> Self {
+        Self::new(false)
+    }
+}
 
 impl Widget for HelpWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
@@ -311,15 +346,139 @@ impl Widget for HelpWidget {
         let inner = block.inner(area);
         block.render(area, buf);
 
-        let controls = vec![
-            Line::from("hjkl/arrows: Move"),
-            Line::from(".: Wait"),
-            Line::from(">: Descend"),
-            Line::from("q: Quit"),
-        ];
+        let controls = if self.targeting_mode {
+            vec![
+                Line::from(Span::styled(
+                    "-- LOOK MODE --",
+                    Style::default().fg(Color::Cyan),
+                )),
+                Line::from("hjkl/arrows: Move cursor"),
+                Line::from("Enter/Space: Select"),
+                Line::from("x/Esc: Exit look mode"),
+            ]
+        } else {
+            vec![
+                Line::from("hjkl/arrows: Move"),
+                Line::from(".: Wait"),
+                Line::from("x: Look mode"),
+                Line::from("i: Inventory"),
+                Line::from("q: Quit"),
+            ]
+        };
 
         Paragraph::new(controls)
             .style(Style::default().fg(Color::Gray))
             .render(inner, buf);
+    }
+}
+
+/// Widget for displaying cursor/target information.
+pub struct CursorWidget<'a> {
+    position: &'a Position,
+    map: &'a GameMap,
+}
+
+impl<'a> CursorWidget<'a> {
+    pub fn new(position: &'a Position, map: &'a GameMap) -> Self {
+        Self { position, map }
+    }
+}
+
+impl Widget for CursorWidget<'_> {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let block = Block::default()
+            .title(" Look ")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Cyan));
+
+        let inner = block.inner(area);
+        block.render(area, buf);
+
+        let mut lines = vec![
+            Line::from(Span::styled(
+                format!("Position: ({}, {})", self.position.x, self.position.y),
+                Style::default().fg(Color::White),
+            )),
+        ];
+
+        // Show tile information if visible
+        if self.map.in_bounds(self.position.x, self.position.y) {
+            let idx = self.map.xy_idx(self.position.x, self.position.y);
+            let visible = self.map.visible.get(idx).copied().unwrap_or(false);
+            let revealed = self.map.revealed.get(idx).copied().unwrap_or(false);
+
+            if visible {
+                let tile = self.map.tiles[idx];
+                let tile_name = match tile {
+                    TileType::Wall => "Wall",
+                    TileType::Floor => "Floor",
+                    TileType::Door => "Door",
+                    TileType::StairsDown => "Stairs Down",
+                    TileType::StairsUp => "Stairs Up",
+                };
+                lines.push(Line::from(Span::styled(
+                    format!("Tile: {}", tile_name),
+                    Style::default().fg(Color::Gray),
+                )));
+            } else if revealed {
+                lines.push(Line::from(Span::styled(
+                    "Not in view",
+                    Style::default().fg(Color::DarkGray),
+                )));
+            } else {
+                lines.push(Line::from(Span::styled(
+                    "Unexplored",
+                    Style::default().fg(Color::DarkGray),
+                )));
+            }
+        }
+
+        // TODO: Add entity information at cursor position
+
+        Paragraph::new(lines).render(inner, buf);
+    }
+}
+
+/// Widget for displaying the inventory screen.
+pub struct InventoryWidget {
+    // TODO: Add inventory items
+}
+
+impl InventoryWidget {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Default for InventoryWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Widget for InventoryWidget {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let block = Block::default()
+            .title(" Inventory ")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Yellow));
+
+        let inner = block.inner(area);
+        block.render(area, buf);
+
+        // Placeholder content for inventory
+        let lines = vec![
+            Line::from(Span::styled(
+                "Your inventory is empty.",
+                Style::default().fg(Color::DarkGray),
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                "Press 'i' or Esc to close.",
+                Style::default().fg(Color::Gray),
+            )),
+        ];
+
+        Paragraph::new(lines).render(inner, buf);
     }
 }
